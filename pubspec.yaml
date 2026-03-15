@@ -1,0 +1,53 @@
+name: tomguard
+description: TomGuard AI – Tomato Leaf Disease Classifier Flutter App
+publish_to: 'none'
+version: 2.4.1+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # ── Image input ─────────────────────────────────────────────────────────────
+  # Uncomment when ready to integrate:
+  image_picker: ^1.0.7        # camera & gallery picker
+  camera: ^0.10.5+9           # live camera preview
+  image: ^4.1.7               # image processing helpers
+
+  # ── ML inference ────────────────────────────────────────────────────────────
+  # tflite_flutter: ^0.10.4     # run .tflite model on-device
+  # tflite_flutter_helper: ^0.4.2
+
+  # ── Persistence ─────────────────────────────────────────────────────────────
+  # hive_flutter: ^1.1.0        # local DB for scan history
+  # hive: ^2.2.3
+  # path_provider: ^2.1.2
+
+  # ── State management ────────────────────────────────────────────────────────
+  # provider: ^6.1.2            # or riverpod / bloc per preference
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  # ── Assets ──────────────────────────────────────────────────────────────────
+  # assets:
+  #   - assets/models/tomato_classifier.tflite
+  #   - assets/models/labels.txt
+  #   - assets/images/
+
+  # ── Fonts (optional) ────────────────────────────────────────────────────────
+  # fonts:
+  #   - family: Outfit
+  #     fonts:
+  #       - asset: assets/fonts/Outfit-Regular.ttf
+  #       - asset: assets/fonts/Outfit-Bold.ttf
+  #         weight: 700

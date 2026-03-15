@@ -1,0 +1,202 @@
+import 'package:flutter/material.dart';
+import '../models/detection_record.dart';
+import '../theme/app_theme.dart';
+
+class HistoryListItem extends StatelessWidget {
+  final DetectionRecord record;
+
+  const HistoryListItem({super.key, required this.record});
+
+  Color get _statusBg {
+    switch (record.status) {
+      case DetectionStatus.healthy:
+        return AppTheme.accentGreen;
+      case DetectionStatus.diseased:
+        return AppTheme.lightRed;
+      case DetectionStatus.suspect:
+        return AppTheme.lightAmber;
+    }
+  }
+
+  Color get _statusFg {
+    switch (record.status) {
+      case DetectionStatus.healthy:
+        return AppTheme.primaryGreen;
+      case DetectionStatus.diseased:
+        return AppTheme.tomatoRed;
+      case DetectionStatus.suspect:
+        return AppTheme.warningAmber;
+    }
+  }
+
+  Color get _thumbBg {
+    switch (record.status) {
+      case DetectionStatus.healthy:
+        return AppTheme.accentGreen;
+      case DetectionStatus.diseased:
+        return AppTheme.lightRed;
+      case DetectionStatus.suspect:
+        return AppTheme.lightAmber;
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inMinutes < 60) return 'Today, ${_timeStr(dt)}';
+    if (diff.inHours < 24) return 'Today, ${_timeStr(dt)}';
+    if (diff.inHours < 48) return 'Yesterday, ${_timeStr(dt)}';
+
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[dt.month - 1]} ${dt.day}, ${_timeStr(dt)}';
+  }
+
+  String _timeStr(DateTime dt) {
+    final h = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final m = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$h:$m $ampm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderColor),
+      ),
+      child: Row(
+        children: [
+          // ── Thumbnail ───────────────────────────────────────────────────
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _thumbBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: CustomPaint(
+              painter: _ThumbnailLeafPainter(status: record.status),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // ── Info ─────────────────────────────────────────────────────────
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  record.leafLabel,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.darkText,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatDate(record.scannedAt),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppTheme.mutedText,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  record.confidence.toStringAsFixed(1) + '% confidence',
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppTheme.subtleText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // ── Status tag ───────────────────────────────────────────────────
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _statusBg,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              record.statusLabel,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: _statusFg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Mini leaf CustomPainter for thumbnail ─────────────────────────────────────
+class _ThumbnailLeafPainter extends CustomPainter {
+  final DetectionStatus status;
+
+  const _ThumbnailLeafPainter({required this.status});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final r = size.width * 0.3;
+
+    final leafPath = Path()
+      ..moveTo(cx, cy - r * 1.4)
+      ..cubicTo(
+          cx + r * 0.9, cy - r * 1.3, cx + r, cy, cx, cy + r * 1.4)
+      ..cubicTo(
+          cx - r, cy, cx - r * 0.9, cy - r * 1.3, cx, cy - r * 1.4);
+
+    canvas.drawPath(
+      leafPath,
+      Paint()
+        ..color = const Color(0xFF5AA84E).withOpacity(
+            status == DetectionStatus.healthy ? 0.9 : 0.7)
+        ..style = PaintingStyle.fill,
+    );
+
+    // vein
+    canvas.drawLine(
+      Offset(cx, cy - r * 1.2),
+      Offset(cx, cy + r * 1.2),
+      Paint()
+        ..color = const Color(0xFF3A7030).withOpacity(0.4)
+        ..strokeWidth = 1.0
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // disease spots
+    if (status == DetectionStatus.diseased) {
+      canvas.drawCircle(Offset(cx - 6, cy + 2), 4.5,
+          Paint()..color = const Color(0xFFC8442A).withOpacity(0.7));
+      canvas.drawCircle(Offset(cx + 7, cy - 5), 4,
+          Paint()..color = const Color(0xFFC8442A).withOpacity(0.5));
+    } else if (status == DetectionStatus.suspect) {
+      canvas.drawCircle(Offset(cx, cy + 3), 4,
+          Paint()..color = const Color(0xFFD4922A).withOpacity(0.6));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
