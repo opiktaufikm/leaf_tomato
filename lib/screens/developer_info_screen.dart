@@ -7,46 +7,24 @@ class DeveloperInfoScreen extends StatelessWidget {
 
   static const List<Map<String, dynamic>> _developers = [
     {
-      'name': 'Ahmad Rifai',
-      'role': 'Lead Developer & ML Engineer',
-      'email': 'ahmad.rifai@tomguard.ai',
-      'tag': 'ML',
+      'name': 'Opik Taufik Mutaqin',
+      'role': 'Teknik Informatika',
+      'email': '20220810112',
+      'tag': 'TI-04',
       'avatarColor': AppTheme.primaryGreen,
       'avatarBg': AppTheme.accentGreen,
       'tagBg': AppTheme.accentGreen,
       'tagColor': AppTheme.primaryGreen,
     },
-    {
-      'name': 'Siti Nurhaliza',
-      'role': 'UI/UX Designer',
-      'email': 'siti.nurhaliza@tomguard.ai',
-      'tag': 'Design',
-      'avatarColor': AppTheme.tomatoRed,
-      'avatarBg': AppTheme.lightRed,
-      'tagBg': AppTheme.lightRed,
-      'tagColor': Color(0xFF9A2A18),
-    },
-    {
-      'name': 'Budi Santoso',
-      'role': 'Backend & API Developer',
-      'email': 'budi.santoso@tomguard.ai',
-      'tag': 'API',
-      'avatarColor': AppTheme.tealAccent,
-      'avatarBg': AppTheme.lightTeal,
-      'tagBg': AppTheme.lightTeal,
-      'tagColor': Color(0xFF1A5A54),
-    },
   ];
 
   static const List<Map<String, String>> _techStack = [
-    {'name': 'TensorFlow', 'type': 'green'},
-    {'name': 'ResNet-50', 'type': 'green'},
-    {'name': 'Flutter', 'type': 'red'},
-    {'name': 'Firebase', 'type': 'blue'},
-    {'name': 'OpenCV', 'type': 'green'},
-    {'name': 'Dart', 'type': 'red'},
     {'name': 'Python', 'type': 'blue'},
-    {'name': 'FastAPI', 'type': 'green'},
+    {'name': 'TensorFlow', 'type': 'green'},
+    {'name': 'MobileNetV2', 'type': 'green'},
+    {'name': 'Flutter', 'type': 'red'},
+    {'name': 'Dart', 'type': 'red'},
+    {'name': 'Firebase', 'type': 'blue'},
   ];
 
   Color _pillBg(String type) {
@@ -100,7 +78,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'DEVELOPER TEAM',
+                    'INFORMASI PENGEMBANG',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -110,7 +88,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'TomGuard AI',
+                    'Tomato',
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
@@ -119,7 +97,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Tomato Leaf Disease Classifier',
+                    'Klasifikasi Penyakit Daun Tomat',
                     style: TextStyle(
                       fontSize: 13,
                       color: Color(0x88C8DCC5),
@@ -147,7 +125,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         const Text(
-                          'v2.4.1 · Production',
+                          'Universitas Kuningan',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
@@ -161,7 +139,6 @@ class DeveloperInfoScreen extends StatelessWidget {
               ),
             ),
           ),
-
           // ── Developer Cards ───────────────────────────────────────────────
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -202,7 +179,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'TECH STACK',
+                      'TEKNOLOGI YANG DIGUNAKAN',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -254,7 +231,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'MODEL PERFORMANCE',
+                      'PERFORMA MODEL',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -267,7 +244,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _PerformanceItem(
-                            label: 'Accuracy',
+                            label: 'Akurasi',
                             value: '96.3%',
                             progress: 0.963,
                             color: AppTheme.primaryGreen,
@@ -276,7 +253,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: _PerformanceItem(
-                            label: 'F1 Score',
+                            label: 'Skor F1',
                             value: '0.942',
                             progress: 0.942,
                             color: AppTheme.lightGreen,
@@ -287,7 +264,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Diseases',
+                              'Kelas',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: AppTheme.subtleText,
@@ -295,7 +272,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             const Text(
-                              '9',
+                              '4',
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w700,
@@ -327,7 +304,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
                     Text(
-                      'APP INFO',
+                      'INFORMASI APLIKASI',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -336,11 +313,10 @@ class DeveloperInfoScreen extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 12),
-                    _InfoRow(label: 'App Name', value: 'TomGuard AI'),
-                    _InfoRow(label: 'Version', value: '2.4.1'),
-                    _InfoRow(label: 'Build', value: '2024.03.14'),
-                    _InfoRow(label: 'Platform', value: 'Flutter (iOS & Android)'),
-                    _InfoRow(label: 'License', value: 'MIT License'),
+                    _InfoRow(label: 'Nama App', value: 'Tomato'),
+                    _InfoRow(label: 'Versi', value: '1.0.0'),
+                    _InfoRow(label: 'Dibuat', value: '2026.03.15'),
+                    _InfoRow(label: 'Platform', value: 'Android'),
                   ],
                 ),
               ),

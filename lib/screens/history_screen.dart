@@ -41,7 +41,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Scan History',
+                      'Riwayat Deteksi',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
@@ -50,7 +50,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${dummyHistory.length} records · Last 30 days',
+                      '${dummyHistory.length} data terekam · 30 hari terakhir',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.subtleText,
@@ -59,74 +59,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                     const SizedBox(height: 14),
 
-                    // ── Summary Card ────────────────────────────────────────
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: AppTheme.accentGreen,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: Row(
-                        children: [
-                          _SummaryItem(
-                            value: '$_healthyCount',
-                            label: 'Healthy',
-                            valueColor: AppTheme.primaryGreen,
-                          ),
-                          Container(
-                            width: 1,
-                            height: 32,
-                            color: const Color(0xFFC5DCC2),
-                            margin: const EdgeInsets.symmetric(horizontal: 14),
-                          ),
-                          _SummaryItem(
-                            value: '$_diseasedCount',
-                            label: 'Diseased',
-                            valueColor: AppTheme.tomatoRed,
-                          ),
-                          Container(
-                            width: 1,
-                            height: 32,
-                            color: const Color(0xFFC5DCC2),
-                            margin: const EdgeInsets.symmetric(horizontal: 14),
-                          ),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                MiniBarChart(),
-                                SizedBox(height: 4),
-                                Text(
-                                  '7-day trend',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: AppTheme.subtleText,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
                     // ── Filter Chips ────────────────────────────────────────
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
                           _FilterChip(
-                            label: 'All',
+                            label: 'Semua',
                             isActive: _activeFilter == null,
                             onTap: () =>
                                 setState(() => _activeFilter = null),
                           ),
                           const SizedBox(width: 6),
                           _FilterChip(
-                            label: 'Healthy',
+                            label: 'Sehat',
                             isActive:
                                 _activeFilter == DetectionStatus.healthy,
                             onTap: () => setState(() =>
@@ -134,20 +80,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           const SizedBox(width: 6),
                           _FilterChip(
-                            label: 'Diseased',
+                            label: 'Penyakit',
                             isActive:
                                 _activeFilter == DetectionStatus.diseased,
                             onTap: () => setState(() =>
                                 _activeFilter = DetectionStatus.diseased),
                           ),
                           const SizedBox(width: 6),
-                          _FilterChip(
-                            label: 'Suspect',
-                            isActive:
-                                _activeFilter == DetectionStatus.suspect,
-                            onTap: () => setState(() =>
-                                _activeFilter = DetectionStatus.suspect),
-                          ),
                         ],
                       ),
                     ),

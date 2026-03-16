@@ -1,56 +1,75 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:camera/camera.dart';
 import '../theme/app_theme.dart';
 import '../widgets/stat_chip.dart';
 import '../widgets/action_button.dart';
 import '../widgets/leaf_hero_painter.dart';
+import '../models/analysis_result.dart';
 import 'live_detection_screen.dart';
+import 'guide_screen.dart';
+import 'image_preview_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  // ── Placeholder: image_picker (camera) ──────────────────────────────────────
   Future<void> _pickFromCamera(BuildContext context) async {
-    // TODO: implement with image_picker
-    // final ImagePicker picker = ImagePicker();
-    // final XFile? image = await picker.pickImage(source: ImageSource.camera);
-    // if (image != null) { /* navigate to result screen */ }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Camera picker — belum diimplementasi'),
-        backgroundColor: AppTheme.primaryGreen,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    final ImagePicker picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+      preferredCameraDevice: CameraDevice.rear,
     );
+    if (file == null || !context.mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ImagePreviewScreen(
+        sourceType: ImageSourceType.camera,
+        imagePath: file.path,
+      ),
+    ));
   }
 
-  // ── Placeholder: image_picker (gallery) ─────────────────────────────────────
   Future<void> _pickFromGallery(BuildContext context) async {
-    // TODO: implement with image_picker
-    // final ImagePicker picker = ImagePicker();
-    // final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    // if (image != null) { /* navigate to result screen */ }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Gallery picker — belum diimplementasi'),
-        backgroundColor: AppTheme.tomatoRed,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    final ImagePicker picker = ImagePicker();
+    final XFile? file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
     );
+    if (file == null || !context.mounted) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => ImagePreviewScreen(
+        sourceType: ImageSourceType.gallery,
+        imagePath: file.path,
+      ),
+    ));
   }
 
-  // ── Navigate to Live Detection (index 1 via parent) ──────────────────────────
-  void _goLive(BuildContext context) {
-    // Access parent MainScaffold to switch tab index
-    final scaffold = context.findAncestorStateOfType<State>();
-    // Use a callback pattern — MainScaffold exposes navigateTo()
-    // For simplicity we use a route push here:
+  // ── Buka halaman Panduan ────────────────────────────────────────────────────
+  void _openGuide(BuildContext context) {
     Navigator.of(context).push(
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const _LiveDetectionOverlay(),
+        pageBuilder: (_, __, ___) => const GuideScreen(),
+        transitionsBuilder: (_, anim, __, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1.0, 0.0),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
+        transitionDuration: const Duration(milliseconds: 350),
+      ),
+    );
+  }
+
+  // ── Buka halaman Live Detection ─────────────────────────────────────────────
+  void _goLive(BuildContext context) {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) =>
+            const LiveDetectionScreen(showBackButton: true),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
       ),
     );
   }
@@ -67,44 +86,96 @@ class HomeScreen extends StatelessWidget {
             children: [
               const SizedBox(height: 16),
 
-              // ── Badge ──────────────────────────────────────────────────────
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentGreen,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: AppTheme.lightGreen,
-                        shape: BoxShape.circle,
+              // ── Top Row: Badge + Tombol Panduan (?) ────────────────────────
+              Row(
+                children: [
+                  // Badge TomGuard AI
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentGreen,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppTheme.lightGreen,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'TOMATO',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.primaryGreen,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // ── Tombol Tanda Tanya / Panduan ─────────────────────────
+                  GestureDetector(
+                    onTap: () => _openGuide(context),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.borderColor),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Stack(
+                        children: [
+                          const Center(
+                            child: Icon(
+                              Icons.help_outline_rounded,
+                              size: 20,
+                              color: AppTheme.primaryGreen,
+                            ),
+                          ),
+                          // Indikator dot merah
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: const BoxDecoration(
+                                color: AppTheme.tomatoRed,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'TOMGUARD AI',
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryGreen,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               // ── Title ──────────────────────────────────────────────────────
               const Text(
-                'Scan &\nDetect',
+                'Pindai &\nDeteksi',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
@@ -114,11 +185,8 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               const Text(
-                'Identify tomato leaf diseases instantly',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppTheme.subtleText,
-                ),
+                'Identifikasi penyakit tanaman tomat secara instan',
+                style: TextStyle(fontSize: 13, color: AppTheme.subtleText),
               ),
 
               const SizedBox(height: 20),
@@ -143,25 +211,25 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 16),
 
               // ── Quick Stats ────────────────────────────────────────────────
-              Row(
-                children: const [
+              const Row(
+                children: [
                   StatChip(
                     value: '128',
-                    label: 'Total Scans',
+                    label: 'Total Pindai',
                     valueColor: AppTheme.primaryGreen,
                     backgroundColor: Color(0xFFF2F7F1),
                   ),
                   SizedBox(width: 8),
                   StatChip(
                     value: '74%',
-                    label: 'Healthy',
+                    label: 'Sehat',
                     valueColor: Color(0xFF5A7A5A),
                     backgroundColor: Color(0xFFF2F7F1),
                   ),
                   SizedBox(width: 8),
                   StatChip(
                     value: '3',
-                    label: 'Diseases',
+                    label: 'Penyakit',
                     valueColor: AppTheme.tomatoRed,
                     backgroundColor: AppTheme.lightRed,
                   ),
@@ -170,7 +238,7 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // ── Action Buttons ─────────────────────────────────────────────
+              // ── Tombol Ambil via Kamera ────────────────────────────────────
               ActionButton(
                 icon: Icons.camera_alt_rounded,
                 title: 'Ambil via Kamera',
@@ -186,6 +254,7 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 10),
 
+              // ── Tombol Upload dari Galeri ──────────────────────────────────
               ActionButton(
                 icon: Icons.photo_library_rounded,
                 title: 'Upload dari Galeri',
@@ -215,7 +284,6 @@ class HomeScreen extends StatelessWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: AppTheme.mutedText,
-                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
@@ -225,7 +293,7 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              // ── Realtime Detection Button ──────────────────────────────────
+              // ── Tombol Deteksi Realtime ────────────────────────────────────
               GestureDetector(
                 onTap: () => _goLive(context),
                 child: Container(
@@ -241,7 +309,6 @@ class HomeScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      // Icon with pulse indicator
                       Stack(
                         children: [
                           Container(
@@ -322,8 +389,8 @@ class HomeScreen extends StatelessWidget {
                       Container(
                         width: 28,
                         height: 28,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFC0DDD9),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFC0DDD9),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
@@ -337,21 +404,11 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-// ── Thin overlay wrapper so Live screen is reachable from Home button ──────────
-class _LiveDetectionOverlay extends StatelessWidget {
-  const _LiveDetectionOverlay();
-
-  @override
-  Widget build(BuildContext context) {
-    return const LiveDetectionScreen(showBackButton: true);
   }
 }

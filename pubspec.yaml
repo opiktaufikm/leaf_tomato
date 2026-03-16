@@ -1,5 +1,5 @@
 name: tomguard
-description: TomGuard AI – Tomato Leaf Disease Classifier Flutter App
+description: TomGuard Tomato Leaf Disease Classifier Flutter App
 publish_to: 'none'
 version: 2.4.1+1
 
@@ -13,7 +13,6 @@ dependencies:
   cupertino_icons: ^1.0.6
 
   # ── Image input ─────────────────────────────────────────────────────────────
-  # Uncomment when ready to integrate:
   image_picker: ^1.0.7        # camera & gallery picker
   camera: ^0.10.5+9           # live camera preview
   image: ^4.1.7               # image processing helpers
