@@ -120,3 +120,4 @@ Ganti `dummyHistory` di `detection_record.dart` dengan data dari Hive box.
 # leaf_tomato
 # leaf_tomato
 # leaf_tomato
+# leaf_tomato

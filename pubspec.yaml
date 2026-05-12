@@ -12,36 +12,42 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
 
-  # ── Image input ─────────────────────────────────────────────────────────────
-  image_picker: ^1.0.7        # camera & gallery picker
-  camera: ^0.10.5+9           # live camera preview
-  image: ^4.1.7               # image processing helpers
+  # ── Image input ───────────────────────────────────────────────────────────
+  image_picker: ^1.0.7          # Camera & gallery picker
+  camera: ^0.10.5+9             # Live camera preview stream
+  image: ^4.1.7                 # Image resizing / preprocessing
 
-  # ── ML inference ────────────────────────────────────────────────────────────
-  # tflite_flutter: ^0.10.4     # run .tflite model on-device
-  # tflite_flutter_helper: ^0.4.2
+  # ── ML inference ─────────────────────────────────────────────────────────
+  tflite_flutter: ^0.12.1       # On-device TFLite inference
 
-  # ── Persistence ─────────────────────────────────────────────────────────────
-  # hive_flutter: ^1.1.0        # local DB for scan history
-  # hive: ^2.2.3
-  # path_provider: ^2.1.2
+  # ── Persistence ──────────────────────────────────────────────────────────
+  hive_flutter: ^1.1.0          # Local DB for scan history (NoSQL box)
+  hive: ^2.2.3
+  path_provider: ^2.1.2         # App document directory
 
-  # ── State management ────────────────────────────────────────────────────────
-  # provider: ^6.1.2            # or riverpod / bloc per preference
+  # ── State management ─────────────────────────────────────────────────────
+  provider: ^6.1.2              # Lightweight state management
+
+  # ── Utilities ────────────────────────────────────────────────────────────
+  intl: ^0.19.0                 # Date/time formatting
+  share_plus: ^7.2.2            # Share results
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  build_runner: ^2.4.9
+  hive_generator: ^2.0.1
 
 flutter:
   uses-material-design: true
 
-  # ── Assets ──────────────────────────────────────────────────────────────────
-  # assets:
-  #   - assets/models/tomato_classifier.tflite
-  #   - assets/models/labels.txt
-  #   - assets/images/
+  assets:
+    - assets/models/
+    - assets/labels/
+    - assets/images/
+    - assets/models/model_daun_tomat.tflite
+    - assets/labels/labels.txt
 
   # ── Fonts (optional) ────────────────────────────────────────────────────────
   # fonts:

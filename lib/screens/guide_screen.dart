@@ -55,7 +55,7 @@ const List<_GuideSection> _guideSections = [
     steps: [
       _GuideStep(
         number: 1,
-        title: 'Buka Halaman Home',
+        title: 'Buka Halaman Beranda',
         description:
             'Pastikan kamu berada di halaman utama aplikasi. Kamu akan melihat tiga tombol aksi di bagian bawah.',
         stepIcon: Icons.home_rounded,
@@ -78,14 +78,14 @@ const List<_GuideSection> _guideSections = [
         number: 4,
         title: 'Tunggu Proses Analisis',
         description:
-            'Aplikasi akan memproses gambar menggunakan model. Proses ini berlangsung beberapa detik tergantung kualitas gambar.',
+            'Aplikasi akan memproses gambar menggunakan model AI. Proses ini berlangsung beberapa detik tergantung kualitas gambar.',
         stepIcon: Icons.hourglass_top_rounded,
       ),
       _GuideStep(
         number: 5,
         title: 'Lihat Hasil Deteksi',
         description:
-            'Hasil analisis akan ditampilkan beserta nama penyakit, tingkat kepercayaan (confidence), dan deskripsi penyakit.',
+            'Hasil analisis akan ditampilkan beserta nama penyakit, tingkat kepercayaan (confidence), dan rekomendasi penanganan.',
         stepIcon: Icons.task_alt_rounded,
       ),
     ],
@@ -103,7 +103,7 @@ const List<_GuideSection> _guideSections = [
     steps: [
       _GuideStep(
         number: 1,
-        title: 'Buka Halaman Home',
+        title: 'Buka Halaman Beranda',
         description:
             'Pastikan kamu berada di halaman utama. Siapkan daun tomat yang ingin diperiksa kondisinya.',
         stepIcon: Icons.home_rounded,
@@ -133,7 +133,7 @@ const List<_GuideSection> _guideSections = [
         number: 5,
         title: 'Konfirmasi & Analisis',
         description:
-            'Tinjau foto yang diambil. Jika sudah bagus, konfirmasi untuk memulai analisis. Hasil akan muncul dalam beberapa detik.',
+            'Tinjau foto yang diambil. Jika sudah bagus, konfirmasi untuk memulai analisis AI. Hasil akan muncul dalam beberapa detik.',
         stepIcon: Icons.check_circle_rounded,
       ),
     ],
@@ -147,11 +147,11 @@ const List<_GuideSection> _guideSections = [
     iconBg: Color(0xFFE8F4F2),
     accentColor: Color(0xFF2A7068),
     tip:
-        'Mode ini membutuhkan cahaya yang baik. Gerakkan kamera perlahan agar dapat memproses setiap frame dengan akurat.',
+        'Mode ini membutuhkan cahaya yang baik. Gerakkan kamera perlahan agar AI dapat memproses setiap frame dengan akurat.',
     steps: [
       _GuideStep(
         number: 1,
-        title: 'Buka Halaman Home',
+        title: 'Buka Halaman Beranda',
         description:
             'Pergi ke halaman utama. Tombol Deteksi Realtime berada di bagian paling bawah, ditandai badge "LIVE" berwarna hijau.',
         stepIcon: Icons.home_rounded,
@@ -183,54 +183,6 @@ const List<_GuideSection> _guideSections = [
         description:
             'Saat hasil deteksi sudah stabil, ketuk tombol "Capture & Save" untuk menyimpan hasil ke riwayat scan.',
         stepIcon: Icons.save_alt_rounded,
-      ),
-    ],
-  ),
-  _GuideSection(
-    id: 'history',
-    title: 'Riwayat Deteksi',
-    subtitle: 'Lihat & kelola semua hasil scan',
-    icon: Icons.history_rounded,
-    iconColor: Color(0xFF5A5A8A),
-    iconBg: Color(0xFFEEEEF8),
-    accentColor: Color(0xFF5A5A8A),
-    tip:
-        'Riwayat tersimpan secara lokal di perangkatmu. Gunakan filter untuk menemukan scan tertentu dengan lebih cepat.',
-    steps: [
-      _GuideStep(
-        number: 1,
-        title: 'Buka Tab History',
-        description:
-            'Ketuk ikon "History" di navigation bar bawah. Halaman riwayat akan menampilkan semua scan yang pernah dilakukan.',
-        stepIcon: Icons.history_rounded,
-      ),
-      _GuideStep(
-        number: 2,
-        title: 'Lihat Ringkasan Statistik',
-        description:
-            'Di bagian atas terdapat kartu ringkasan yang menampilkan jumlah scan sehat vs sakit, beserta grafik tren 7 hari terakhir.',
-        stepIcon: Icons.bar_chart_rounded,
-      ),
-      _GuideStep(
-        number: 3,
-        title: 'Gunakan Filter',
-        description:
-            'Ketuk chip filter "All", "Healthy", "Diseased", atau "Suspect" untuk menyaring riwayat berdasarkan status deteksi.',
-        stepIcon: Icons.filter_list_rounded,
-      ),
-      _GuideStep(
-        number: 4,
-        title: 'Baca Detail Riwayat',
-        description:
-            'Setiap item menampilkan thumbnail daun berwarna, nama penyakit, tanggal scan, dan tingkat kepercayaan model.',
-        stepIcon: Icons.info_outline_rounded,
-      ),
-      _GuideStep(
-        number: 5,
-        title: 'Ketuk untuk Detail Lengkap',
-        description:
-            'Tap salah satu item riwayat untuk melihat detail lengkap: gambar asli, jenis penyakit, tingkat keparahan, dan saran penanganan.',
-        stepIcon: Icons.open_in_new_rounded,
       ),
     ],
   ),
@@ -313,7 +265,7 @@ class _GuideScreenState extends State<GuideScreen>
                           ),
                         ),
                         Text(
-                          'Cara menggunakan semua fitur TomGuard',
+                          'Cara menggunakan semua fitur TomatKu',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppTheme.subtleText,
@@ -402,10 +354,7 @@ class _GuideScreenState extends State<GuideScreen>
                                 ? 'Galeri'
                                 : section.title.split(' ').first == 'Ambil'
                                     ? 'Kamera'
-                                    : section.title.split(' ').first ==
-                                            'Deteksi'
-                                        ? 'Realtime'
-                                        : 'History',
+                                    : 'Realtime',
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -554,7 +503,63 @@ class _GuideSectionView extends StatelessWidget {
               isLast: isLast,
             );
           }),
+
           const SizedBox(height: 16),
+
+          // ── Tip card ────────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF8E8),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFFD580).withOpacity(0.6),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEDB0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.lightbulb_rounded,
+                    size: 16,
+                    color: Color(0xFFB07800),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Tips & Trik',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8A5A00),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        section.tip,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF7A5200),
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

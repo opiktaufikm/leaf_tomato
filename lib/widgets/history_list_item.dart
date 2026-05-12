@@ -44,13 +44,13 @@ class HistoryListItem extends StatelessWidget {
     final now = DateTime.now();
     final diff = now.difference(dt);
 
-    if (diff.inMinutes < 60) return 'Today, ${_timeStr(dt)}';
-    if (diff.inHours < 24) return 'Today, ${_timeStr(dt)}';
-    if (diff.inHours < 48) return 'Yesterday, ${_timeStr(dt)}';
+    if (diff.inMinutes < 60) return 'Hari ini, ${_timeStr(dt)}';
+    if (diff.inHours < 24) return 'Hari ini, ${_timeStr(dt)}';
+    if (diff.inHours < 48) return 'Kemarin, ${_timeStr(dt)}';
 
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
     ];
     return '${months[dt.month - 1]} ${dt.day}, ${_timeStr(dt)}';
   }
@@ -113,7 +113,7 @@ class HistoryListItem extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  record.confidence.toStringAsFixed(1) + '% confidence',
+                  record.confidence.toStringAsFixed(1) + '% kepercayaan',
                   style: const TextStyle(
                     fontSize: 9,
                     color: AppTheme.subtleText,

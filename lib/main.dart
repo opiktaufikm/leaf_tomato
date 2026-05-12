@@ -1,19 +1,44 @@
+// ════════════════════════════════════════════════════════════════════════════
+// lib/main.dart
+// ════════════════════════════════════════════════════════════════════════════
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
-import 'screens/live_detection_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/developer_info_screen.dart';
+import 'services/classifier_service.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+late List<CameraDescription> cameras;
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Orientasi hanya portrait ───────────────────────────────────────────
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // ── Status bar transparan ──────────────────────────────────────────────
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+
+  // ── Inisialisasi kamera untuk real-time detection ────────────────────────
+  cameras = await availableCameras();
+
+  // ── Inisialisasi model TFLite di background ────────────────────────────
+  // Model dimuat di sini agar sudah siap saat user pertama kali scan.
+  ClassifierService().initialize().catchError((e) {
+    debugPrint('⚠️  Classifier init error: $e');
+  });
+
   runApp(const TomGuardApp());
 }
 
@@ -23,7 +48,7 @@ class TomGuardApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TomGuard AI',
+      title: 'TomatKu',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainScaffold(),
@@ -31,6 +56,9 @@ class TomGuardApp extends StatelessWidget {
   }
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// Shell dengan bottom navigation bar
+// ══════════════════════════════════════════════════════════════════════════════
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
 
@@ -43,7 +71,6 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   final List<Widget> _screens = const [
     HomeScreen(),
-    LiveDetectionScreen(),
     HistoryScreen(),
     DeveloperInfoScreen(),
   ];
@@ -85,21 +112,21 @@ class _MainScaffoldState extends State<MainScaffold> {
             children: [
               _NavItem(
                 icon: Icons.home_rounded,
-                label: 'Home',
+                label: 'Beranda',
                 isActive: _currentIndex == 0,
                 onTap: () => navigateTo(0),
               ),
               _NavItem(
                 icon: Icons.history_rounded,
-                label: 'History',
-                isActive: _currentIndex == 2,
-                onTap: () => navigateTo(2),
+                label: 'Riwayat',
+                isActive: _currentIndex == 1,
+                onTap: () => navigateTo(1),
               ),
               _NavItem(
                 icon: Icons.info_rounded,
-                label: 'About',
-                isActive: _currentIndex == 3,
-                onTap: () => navigateTo(3),
+                label: 'Tentang',
+                isActive: _currentIndex == 2,
+                onTap: () => navigateTo(2),
               ),
             ],
           ),
@@ -133,7 +160,8 @@ class _NavItem extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: isActive
                     ? AppTheme.primaryGreen.withOpacity(0.12)

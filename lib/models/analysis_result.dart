@@ -98,7 +98,7 @@ final List<AnalysisResult> dummyAnalysisResults = [
     ],
   ),
   AnalysisResult(
-    diseaseName: 'Late Blight',
+    diseaseName: 'Busuk Daun',
     scientificName: 'Phytophthora infestans',
     confidence: 73.5,
     severity: SeverityLevel.high,
@@ -155,7 +155,7 @@ final List<AnalysisResult> dummyAnalysisResults = [
     ],
   ),
   AnalysisResult(
-    diseaseName: 'Septoria Leaf Spot',
+    diseaseName: 'Bercak Daun',
     scientificName: 'Septoria lycopersici',
     confidence: 91.2,
     severity: SeverityLevel.moderate,

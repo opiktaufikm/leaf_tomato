@@ -24,11 +24,11 @@ class DetectionRecord {
   String get statusLabel {
     switch (status) {
       case DetectionStatus.healthy:
-        return 'Healthy';
+        return 'Sehat';
       case DetectionStatus.diseased:
-        return 'Diseased';
+        return 'Penyakit';
       case DetectionStatus.suspect:
-        return 'Suspect';
+        return 'Suspek';
     }
   }
 }
@@ -38,7 +38,7 @@ final List<DetectionRecord> dummyHistory = [
   DetectionRecord(
     id: '128',
     leafLabel: 'Leaf Sample #128',
-    diseaseName: 'Healthy',
+    diseaseName: 'Sehat',
     scientificName: 'No disease detected',
     scannedAt: DateTime.now().subtract(const Duration(minutes: 3)),
     status: DetectionStatus.healthy,
@@ -68,7 +68,7 @@ final List<DetectionRecord> dummyHistory = [
   DetectionRecord(
     id: '125',
     leafLabel: 'Leaf Sample #125',
-    diseaseName: 'Healthy',
+    diseaseName: 'Sehat',
     scientificName: 'No disease detected',
     scannedAt: DateTime.now().subtract(const Duration(days: 1, hours: 6, minutes: 21)),
     status: DetectionStatus.healthy,
@@ -88,7 +88,7 @@ final List<DetectionRecord> dummyHistory = [
   DetectionRecord(
     id: '123',
     leafLabel: 'Leaf Sample #123',
-    diseaseName: 'Healthy',
+    diseaseName: 'Sehat',
     scientificName: 'No disease detected',
     scannedAt: DateTime.now().subtract(const Duration(days: 2, hours: 8)),
     status: DetectionStatus.healthy,
