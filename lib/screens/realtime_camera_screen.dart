@@ -6,13 +6,18 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import 'dart:async';
+import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import '../theme/app_theme.dart';
 import '../services/classifier_service.dart';
+import '../services/detection_history_service.dart';
+import '../models/detection_record.dart';
 
 // ── Isolate entry point ───────────────────────────────────────────────────
 void _yuvEncodeIsolate(SendPort sendPort) {
@@ -74,6 +79,7 @@ class _RealtimeCameraScreenState extends State<RealtimeCameraScreen>
     with WidgetsBindingObserver {
 
   final ClassifierService _classifier = ClassifierService();
+  final DetectionHistoryService _historyService = DetectionHistoryService();
 
   _InitStage _stage = _InitStage.loadingModel;
   String? _initError;
@@ -85,6 +91,7 @@ class _RealtimeCameraScreenState extends State<RealtimeCameraScreen>
   String _currentLabel = '';
   double _currentConfidence = 0.0;
   bool _hasResult = false;       // true begitu ada hasil pertama kali
+  Uint8List? _lastFrameBytes;    // Simpan frame terakhir untuk disimpan saat user klik Save
 
   // Throttle: 800ms antar inferensi untuk kurangi lag
   static const int _inferenceIntervalMs = 800;
@@ -184,6 +191,9 @@ class _RealtimeCameraScreenState extends State<RealtimeCameraScreen>
           : _encodeYUVFallback(frame);
       if (bytes == null) { _isDetecting = false; return; }
 
+      // Simpan frame bytes untuk di-save nanti jika user klik "Simpan Hasil"
+      _lastFrameBytes = bytes;
+
       final result = await _classifier.classifyImageBytes(bytes);
 
       // ── Selalu tampilkan hasil apapun (tidak diblok threshold) ──────────
@@ -227,6 +237,86 @@ class _RealtimeCameraScreenState extends State<RealtimeCameraScreen>
     );
   }
 
+  /// Helper untuk simpan frame bytes ke file
+  Future<String?> _saveFrameToFile(Uint8List? bytes) async {
+    if (bytes == null) return null;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory('${appDir.path}/detection_images');
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
+      
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filePath = '${imagesDir.path}/realtime_$timestamp.jpg';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+      return filePath;
+    } catch (e) {
+      debugPrint('Error saving frame: $e');
+      return null;
+    }
+  }
+
+  Future<void> _saveCurrentDetection() async {
+    if (!_hasResult || _currentLabel.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Belum ada hasil deteksi untuk disimpan'),
+          backgroundColor: AppTheme.tomatoRed,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(milliseconds: 1500),
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Simpan frame ke file
+      final imagePath = await _saveFrameToFile(_lastFrameBytes);
+      
+      final diseaseInfo = DiseaseInfo.getInfo(_currentLabel);
+      final status = _isHealthy ? DetectionStatus.healthy : DetectionStatus.diseased;
+      final placeholderColor = _isHealthy ? 'EBF5E8' : 'FEF3F1';
+
+      final record = DetectionRecord(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        leafLabel: _currentLabel,
+        diseaseName: _currentLabel,
+        scientificName: diseaseInfo.scientificName.isEmpty ? _currentLabel : diseaseInfo.scientificName,
+        scannedAt: DateTime.now(),
+        status: status,
+        confidence: _currentConfidence,
+        imagePlaceholderColor: placeholderColor,
+        imagePath: imagePath,
+      );
+
+      await _historyService.saveDetection(record);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Hasil deteksi telah disimpan ke riwayat'),
+            backgroundColor: AppTheme.primaryGreen,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving detection: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal menyimpan: $e'),
+            backgroundColor: AppTheme.tomatoRed,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   void _setError(String msg) {
     if (!mounted) return;
     setState(() { _stage = _InitStage.error; _initError = msg; });
@@ -248,13 +338,6 @@ class _RealtimeCameraScreenState extends State<RealtimeCameraScreen>
     return _isHealthy
         ? AppTheme.primaryGreen.withOpacity(0.9)
         : AppTheme.tomatoRed.withOpacity(0.9);
-  }
-
-  String _confidenceLabel(double c) {
-    if (c >= 0.90) return '🟢 Sangat Yakin';
-    if (c >= 0.75) return '🟡 Yakin';
-    if (c >= 0.60) return '🟠 Cukup Yakin';
-    return '🔴 Tidak Yakin';
   }
 
   // ── Build ──────────────────────────────────────────────────────────────────
@@ -522,6 +605,27 @@ class _RealtimeCameraScreenState extends State<RealtimeCameraScreen>
       Text(
         '${(_currentConfidence * 100).toStringAsFixed(1)}%',
         style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: _saveCurrentDetection,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white.withOpacity(0.25),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline, size: 18),
+              SizedBox(width: 8),
+              Text('Simpan Hasil', style: TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ),
     ]);
   }

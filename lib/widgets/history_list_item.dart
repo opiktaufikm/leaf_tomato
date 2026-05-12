@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/detection_record.dart';
 import '../theme/app_theme.dart';
@@ -80,10 +81,9 @@ class HistoryListItem extends StatelessWidget {
             decoration: BoxDecoration(
               color: _thumbBg,
               borderRadius: BorderRadius.circular(12),
+              border: record.imagePath != null ? Border.all(color: Colors.transparent) : null,
             ),
-            child: CustomPaint(
-              painter: _ThumbnailLeafPainter(status: record.status),
-            ),
+            child: _buildThumbnail(),
           ),
 
           const SizedBox(width: 12),
@@ -94,7 +94,7 @@ class HistoryListItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  record.leafLabel,
+                  record.diseaseName,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -109,14 +109,6 @@ class HistoryListItem extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 10,
                     color: AppTheme.mutedText,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  record.confidence.toStringAsFixed(1) + '% kepercayaan',
-                  style: const TextStyle(
-                    fontSize: 9,
-                    color: AppTheme.subtleText,
                   ),
                 ),
               ],
@@ -144,6 +136,30 @@ class HistoryListItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  /// Build thumbnail: tampilkan gambar jika ada, atau gunakan leaf painter
+  Widget _buildThumbnail() {
+    // Jika ada imagePath dan file ada, tampilkan gambar
+    if (record.imagePath != null && record.imagePath!.isNotEmpty) {
+      final file = File(record.imagePath!);
+      if (file.existsSync()) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            file,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => CustomPaint(
+              painter: _ThumbnailLeafPainter(status: record.status),
+            ),
+          ),
+        );
+      }
+    }
+    // Fallback ke leaf painter jika tidak ada gambar
+    return CustomPaint(
+      painter: _ThumbnailLeafPainter(status: record.status),
     );
   }
 }

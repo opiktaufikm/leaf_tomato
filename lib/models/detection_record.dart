@@ -9,6 +9,7 @@ class DetectionRecord {
   final DetectionStatus status;
   final double confidence;
   final String imagePlaceholderColor; // hex for placeholder
+  final String? imagePath; // path ke file gambar yang diklasifikasi
 
   const DetectionRecord({
     required this.id,
@@ -19,6 +20,7 @@ class DetectionRecord {
     required this.status,
     required this.confidence,
     required this.imagePlaceholderColor,
+    this.imagePath,
   });
 
   String get statusLabel {
@@ -29,6 +31,49 @@ class DetectionRecord {
         return 'Penyakit';
       case DetectionStatus.suspect:
         return 'Suspek';
+    }
+  }
+
+  /// Konversi DetectionRecord ke JSON
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'leafLabel': leafLabel,
+      'diseaseName': diseaseName,
+      'scientificName': scientificName,
+      'scannedAt': scannedAt.toIso8601String(),
+      'status': status.name,
+      'confidence': confidence,
+      'imagePlaceholderColor': imagePlaceholderColor,
+      'imagePath': imagePath,
+    };
+  }
+
+  /// Buat DetectionRecord dari JSON
+  factory DetectionRecord.fromJson(Map<String, dynamic> json) {
+    return DetectionRecord(
+      id: json['id'] as String? ?? '',
+      leafLabel: json['leafLabel'] as String? ?? '',
+      diseaseName: json['diseaseName'] as String? ?? '',
+      scientificName: json['scientificName'] as String? ?? '',
+      scannedAt: DateTime.tryParse(json['scannedAt'] as String? ?? '') ?? DateTime.now(),
+      status: _statusFromString(json['status'] as String? ?? 'suspect'),
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
+      imagePlaceholderColor: json['imagePlaceholderColor'] as String? ?? 'FFFFFF',
+      imagePath: json['imagePath'] as String?,
+    );
+  }
+
+  /// Helper untuk konversi string ke DetectionStatus
+  static DetectionStatus _statusFromString(String statusStr) {
+    switch (statusStr.toLowerCase()) {
+      case 'healthy':
+        return DetectionStatus.healthy;
+      case 'diseased':
+        return DetectionStatus.diseased;
+      case 'suspect':
+      default:
+        return DetectionStatus.suspect;
     }
   }
 }

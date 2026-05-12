@@ -2,16 +2,13 @@
 // lib/main.dart
 // ════════════════════════════════════════════════════════════════════════════
 
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/developer_info_screen.dart';
-import 'services/classifier_service.dart';
+import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
-
-late List<CameraDescription> cameras;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,15 +27,6 @@ void main() async {
     ),
   );
 
-  // ── Inisialisasi kamera untuk real-time detection ────────────────────────
-  cameras = await availableCameras();
-
-  // ── Inisialisasi model TFLite di background ────────────────────────────
-  // Model dimuat di sini agar sudah siap saat user pertama kali scan.
-  ClassifierService().initialize().catchError((e) {
-    debugPrint('⚠️  Classifier init error: $e');
-  });
-
   runApp(const TomGuardApp());
 }
 
@@ -51,7 +39,9 @@ class TomGuardApp extends StatelessWidget {
       title: 'TomatKu',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const MainScaffold(),
+      home: const SplashScreen(
+        nextScreen: MainScaffold(),
+      ),
     );
   }
 }
@@ -160,8 +150,7 @@ class _NavItem extends StatelessWidget {
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: isActive
                     ? AppTheme.primaryGreen.withOpacity(0.12)

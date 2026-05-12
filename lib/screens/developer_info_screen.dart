@@ -197,7 +197,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
                                 child: LinearProgressIndicator(
-                                  value: 0.963,
+                                  value: 0.9334,
                                   minHeight: 6,
                                   backgroundColor: AppTheme.borderColor,
                                   valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),
@@ -223,7 +223,7 @@ class DeveloperInfoScreen extends StatelessWidget {
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(4),
                                 child: LinearProgressIndicator(
-                                  value: 0.942,
+                                  value: 0.940,
                                   minHeight: 6,
                                   backgroundColor: AppTheme.borderColor,
                                   valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryGreen),

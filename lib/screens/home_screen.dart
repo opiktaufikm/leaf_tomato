@@ -2,8 +2,11 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../theme/app_theme.dart';
 import '../services/classifier_service.dart';
+import '../services/detection_history_service.dart';
+import '../models/detection_record.dart';
 import '../widgets/action_button.dart';
 import '../widgets/invalid_object_dialog.dart';
 import 'result_screen.dart';
@@ -20,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ImagePicker _picker = ImagePicker();
   final ClassifierService _classifier = ClassifierService();
+  final DetectionHistoryService _historyService = DetectionHistoryService();
   bool _isAnalyzing = false;
 
   Future<void> _pickFromCamera() async {
@@ -48,6 +52,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Copy image ke app documents directory dan return path
+  Future<String?> _copyImageToAppDir(File imageFile) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final imagesDir = Directory('${appDir.path}/detection_images');
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
+      
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final newPath = '${imagesDir.path}/detection_$timestamp.jpg';
+      final copiedFile = await imageFile.copy(newPath);
+      return copiedFile.path;
+    } catch (e) {
+      debugPrint('Error copying image: $e');
+      return null;
+    }
+  }
+
   Future<void> _analyzeImage(File imageFile) async {
     setState(() => _isAnalyzing = true);
     try {
@@ -64,6 +87,35 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
           return;
+        }
+
+        // ── Simpan hasil deteksi ke history ──────────────────────────────
+        try {
+          // Copy image ke app directory
+          final imagePath = await _copyImageToAppDir(imageFile);
+          
+          final diseaseInfo = DiseaseInfo.getInfo(result.label);
+          final status = result.isHealthy ? DetectionStatus.healthy : DetectionStatus.diseased;
+          
+          // Tentukan warna placeholder berdasarkan status
+          final placeholderColor = result.isHealthy ? 'EBF5E8' : 'FEF3F1';
+          
+          final record = DetectionRecord(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            leafLabel: result.label,
+            diseaseName: result.label,
+            scientificName: diseaseInfo.scientificName.isEmpty ? result.label : diseaseInfo.scientificName,
+            scannedAt: DateTime.now(),
+            status: status,
+            confidence: result.confidence,
+            imagePlaceholderColor: placeholderColor,
+            imagePath: imagePath,
+          );
+          
+          await _historyService.saveDetection(record);
+        } catch (e) {
+          debugPrint('Gagal menyimpan ke history: $e');
+          // Lanjut meski gagal menyimpan
         }
 
         // ── Jika valid, tampilkan hasil analisis ─────────────────────────
