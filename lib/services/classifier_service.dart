@@ -12,6 +12,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart'; // ← FIX: diperlukan untuk debugPrint
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -39,7 +40,7 @@ class ClassificationResult {
   /// Apakah ini daun tomat yang valid (bukan objek asing)?
   bool get isValidTomatoLeaf {
     final validLabels = {
-      'healthy', 'sehat', 
+      'healthy', 'sehat',
       'leaf spot', 'bercak daun',
       'leaf blight', 'busuk daun',
       'powdery mildew', 'jamur daun'
@@ -83,38 +84,62 @@ class ClassifierService {
   int get numClasses => _labels.length;
   List<String> get labels => List.unmodifiable(_labels);
 
+  // ── Label kelas non-daun yang harus diabaikan ─────────────────────────────
+  // Tambahkan nama kelas dari labels.txt yang merupakan latar belakang
+  // atau objek asing (bukan penyakit/kondisi daun tomat).
+  static const Set<String> _excludedLabels = {
+    'kotak',
+    'background',
+    'latar belakang',
+    'unknown',
+    'tidak diketahui',
+    'other',
+    'lainnya',
+  };
+
+  /// Minimum confidence agar hasil dianggap valid.
+  static const double _minConfidence = 0.60;
+
+  /// Validasi hasil klasifikasi secara dinamis:
+  ///   true  → label berasal dari kelas daun tomat & confidence cukup tinggi
+  ///   false → label adalah kelas non-daun / background / confidence rendah
+  ///
+  /// Berbeda dengan [ClassificationResult.isValidTomatoLeaf] yang hardcoded,
+  /// method ini memakai [_labels] dari labels.txt → otomatis sesuai model.
+  bool isValidLeafResult(ClassificationResult result) {
+    if (result.confidence < _minConfidence) return false;
+    final lbl = result.label.toLowerCase().trim();
+    if (_excludedLabels.contains(lbl)) return false;
+    return _labels.any((l) => l.toLowerCase().trim() == lbl);
+  }
+
+
   // ── Inisialisasi: muat model + label ─────────────────────────────────────
   Future<void> initialize() async {
     if (_isInitialized) return;
 
     try {
-      // ignore: avoid_print
-      print('[ClassifierService] Memuat model dari: $_modelPath');
+      debugPrint('[ClassifierService] Memuat model dari: $_modelPath');
       final interpreterOptions = InterpreterOptions()..threads = 4;
       _interpreter = await Interpreter.fromAsset(
         _modelPath,
         options: interpreterOptions,
       );
-      // ignore: avoid_print
-      print('[ClassifierService] Model berhasil dimuat');
+      debugPrint('[ClassifierService] Model berhasil dimuat');
 
-      // ignore: avoid_print
-      print('[ClassifierService] Memuat label dari: $_labelsPath');
+      debugPrint('[ClassifierService] Memuat label dari: $_labelsPath');
       final labelData = await rootBundle.loadString(_labelsPath);
       _labels = labelData
           .split('\n')
           .map((l) => l.trim())
           .where((l) => l.isNotEmpty)
           .toList();
-      // ignore: avoid_print
-      print('[ClassifierService] Label berhasil dimuat: $_labels');
+      debugPrint('[ClassifierService] Label berhasil dimuat: $_labels');
 
       _isInitialized = true;
-      // ignore: avoid_print
-      print('[ClassifierService] Inisialisasi selesai');
+      debugPrint('[ClassifierService] Inisialisasi selesai');
     } catch (e) {
-      // ignore: avoid_print
-      print('[ClassifierService] ERROR saat inisialisasi: $e');
+      debugPrint('[ClassifierService] ERROR saat inisialisasi: $e');
       // Lempar error agar app tidak lanjut tanpa model
       throw Exception('Gagal memuat model atau label: $e');
     }
@@ -147,7 +172,7 @@ class ClassifierService {
         final header = bytes.buffer.asInt32List(0, 3);
         final width = header[0];
         final height = header[1];
-        
+
         if (width > 0 && height > 0 && width < 4000 && height < 4000) {
           // YUV420 format detected
           final yPlaneSize = header[2];
@@ -172,7 +197,8 @@ class ClassifierService {
   }
 
   /// ── Decode YUV420 bytes langsung tanpa library ────────────────────────────
-  img.Image _decodeYUV420Direct(Uint8List data, int width, int height, int ySize) {
+  img.Image _decodeYUV420Direct(
+      Uint8List data, int width, int height, int ySize) {
     final image = img.Image(width: width, height: height);
 
     try {
@@ -190,14 +216,16 @@ class ClassifierService {
           final vVal = vPlane[uvIndex].toDouble() - 128.0;
 
           final r = (yVal + 1.402 * vVal).clamp(0, 255).toInt();
-          final g = (yVal - 0.344136 * uVal - 0.714136 * vVal).clamp(0, 255).toInt();
+          final g = (yVal - 0.344136 * uVal - 0.714136 * vVal)
+              .clamp(0, 255)
+              .toInt();
           final b = (yVal + 1.772 * uVal).clamp(0, 255).toInt();
 
           image.setPixelRgba(x, y, r, g, b, 255);
         }
       }
     } catch (e) {
-      debugPrint('⚠️  YUV420 decode failed: $e');
+      debugPrint('⚠️  YUV420 decode failed: $e'); // ← sekarang bisa dikenali
       // Return dummy image jika decode gagal
       return image;
     }
@@ -225,9 +253,9 @@ class ClassifierService {
           for (int x = 0; x < _inputSize; x++) {
             final pixel = resized.getPixel(x, y);
             row.add([
-              (pixel.r / 127.5) - 1.0,  // R
-              (pixel.g / 127.5) - 1.0,  // G
-              (pixel.b / 127.5) - 1.0,  // B
+              (pixel.r / 127.5) - 1.0, // R
+              (pixel.g / 127.5) - 1.0, // G
+              (pixel.b / 127.5) - 1.0, // B
             ]);
           }
           return row;
@@ -245,7 +273,8 @@ class ClassifierService {
     if (_interpreter != null) {
       _interpreter!.run(inputTensor, outputTensor);
     } else {
-      throw Exception('Model belum diinisialisasi. Pastikan initialize() dipanggil terlebih dahulu.');
+      throw Exception(
+          'Model belum diinisialisasi. Pastikan initialize() dipanggil terlebih dahulu.');
     }
 
     // STEP 5: Post-processing
@@ -291,223 +320,239 @@ class ClassifierService {
 // ⚠️ Sesuaikan deskripsi ini dengan penyakit yang ada di dataset Anda
 class DiseaseInfo {
   static Map<String, Info> get _data => {
-    'Healthy': Info(
-      indonesianName: 'Daun Sehat',
-      scientificName: 'Solanum lycopersicum',
-      severity: 'Tidak Ada',
-      severityLevel: 0,
-      description:
-          'Daun tomat dalam kondisi sehat. Tidak ditemukan tanda-tanda '
-          'infeksi penyakit atau serangan hama pada sampel ini.',
-      symptoms: ['Warna daun hijau merata', 'Tidak ada bercak', 'Bentuk normal'],
-      treatment: ['Pertahankan kondisi pertumbuhan optimal', 'Siram secara teratur', 'Beri pupuk sesuai jadwal'],
-      prevention: ['Rotasi tanaman tahunan', 'Jaga kebersihan kebun', 'Gunakan varietas tahan penyakit'],
-      spreadType: 'Tidak Menyebar',
-      season: 'Sepanjang Tahun',
-    ),
-    'Sehat': Info(
-      indonesianName: 'Daun Sehat',
-      scientificName: 'Solanum lycopersicum',
-      severity: 'Tidak Ada',
-      severityLevel: 0,
-      description:
-          'Daun tomat dalam kondisi sehat. Tidak ditemukan tanda-tanda '
-          'infeksi penyakit atau serangan hama pada sampel ini.',
-      symptoms: ['Warna daun hijau merata', 'Tidak ada bercak', 'Bentuk normal'],
-      treatment: ['Pertahankan kondisi pertumbuhan optimal', 'Siram secara teratur', 'Beri pupuk sesuai jadwal'],
-      prevention: ['Rotasi tanaman tahunan', 'Jaga kebersihan kebun', 'Gunakan varietas tahan penyakit'],
-      spreadType: 'Tidak Menyebar',
-      season: 'Sepanjang Tahun',
-    ),
-    'Leaf Spot': Info(
-      indonesianName: 'Bercak Daun',
-      scientificName: 'Alternaria solani',
-      severity: 'Sedang',
-      severityLevel: 2,
-      description:
-          'Gejala ini terjadi pada tanaman tomat karena jamur atau bakteri menghisap nutrisi '
-          'dan merusak jaringan di permukaan bawah daun. Tanda serangan adalah bercak cokelat kecil '
-          'berbentuk cincin konsentris dengan halo kuning. Serangan yang kuat dapat mengakibatkan daun '
-          'menguning dan gugur, menghambat pertumbuhan tanaman, dan bahkan batang menjadi layu, '
-          'setelah daun berubah warna menjadi bintik kehitaman, dan keriput',
-      symptoms: [
-        'Bercak coklat tua dengan pola cincin konsentris',
-        'Tepi bercak berwarna kuning',
-        'Daun bawah terserang lebih awal',
-        'Daun menguning dan rontok',
-      ],
-      treatment: [
-        'Aplikasikan fungisida berbahan aktif mancozeb atau klorotalonil',
-        'Pangkas dan buang daun yang terinfeksi',
-        'Semprot setiap 7-10 hari sekali saat cuaca lembab',
-        'Gunakan fungisida sistemik jika serangan berat',
-      ],
-      prevention: [
-        'Hindari penyiraman dari atas',
-        'Jaga jarak tanam untuk sirkulasi udara',
-        'Mulching untuk mencegah percikan tanah',
-        'Benih yang sehat dan bersertifikat',
-      ],
-      spreadType: 'Melalui Air & Angin',
-      season: 'Musim Hujan',
-    ),
-    'Bercak Daun': Info(
-      indonesianName: 'Bercak Daun',
-      scientificName: 'Alternaria solani',
-      severity: 'Sedang',
-      severityLevel: 2,
-      description:
-          'Gejala ini terjadi pada tanaman tomat karena jamur atau bakteri menghisap nutrisi '
-          'dan merusak jaringan di permukaan bawah daun. Tanda serangan adalah bercak cokelat kecil '
-          'berbentuk cincin konsentris dengan halo kuning. Serangan yang kuat dapat mengakibatkan daun '
-          'menguning dan gugur, menghambat pertumbuhan tanaman, dan bahkan batang menjadi layu, '
-          'setelah daun berubah warna menjadi bintik kehitaman, dan keriput',
-      symptoms: [
-        'Bercak coklat tua dengan pola cincin konsentris',
-        'Tepi bercak berwarna kuning',
-        'Daun bawah terserang lebih awal',
-        'Daun menguning dan rontok',
-      ],
-      treatment: [
-        'Aplikasikan fungisida berbahan aktif mancozeb atau klorotalonil',
-        'Pangkas dan buang daun yang terinfeksi',
-        'Semprot setiap 7-10 hari sekali saat cuaca lembab',
-        'Gunakan fungisida sistemik jika serangan berat',
-      ],
-      prevention: [
-        'Hindari penyiraman dari atas',
-        'Jaga jarak tanam untuk sirkulasi udara',
-        'Mulching untuk mencegah percikan tanah',
-        'Benih yang sehat dan bersertifikat',
-      ],
-      spreadType: 'Melalui Air & Angin',
-      season: 'Musim Hujan',
-    ),
-    'Leaf Blight': Info(
-      indonesianName: 'Busuk Daun',
-      scientificName: 'Phytophthora infestans',
-      severity: 'Tinggi',
-      severityLevel: 3,
-      description:
-          'Gejala ini terjadi pada tanaman tomat karena jamur Phytophthora infestans merusak jaringan '
-          'di permukaan bawah daun. Tanda serangan adalah bercak basah kehitaman dengan lapisan putih. '
-          'Serangan yang kuat dapat mengakibatkan daun menguning dan gugur, menghambat tanaman untuk tumbuh, '
-          'dan bahkan batang tanaman menjadi layu, setelah daun berubah warna menjadi bintik coklat, dan keriput',
-      symptoms: [
-        'Bercak besar coklat kehitaman tidak beraturan',
-        'Permukaan daun bawah terdapat lapisan putih seperti kapas',
-        'Daun mengering dan mati dengan cepat',
-        'Menyebar ke batang dan buah',
-      ],
-      treatment: [
-        'Gunakan fungisida berbahan tembaga (Copper hydroxide)',
-        'Metalaxyl atau propamocarb untuk infeksi berat',
-        'Cabut dan bakar tanaman yang sangat terinfeksi',
-        'Hindari kelembaban berlebih di sekitar tanaman',
-      ],
-      prevention: [
-        'Pilih varietas tahan blight',
-        'Sanitasi lahan setelah panen',
-        'Semprot preventif saat musim hujan',
-        'Perbaiki drainase tanah',
-      ],
-      spreadType: 'Menyebar Cepat',
-      season: 'Musim Dingin/Hujan',
-    ),
-    'Busuk Daun': Info(
-      indonesianName: 'Busuk Daun',
-      scientificName: 'Phytophthora infestans',
-      severity: 'Tinggi',
-      severityLevel: 3,
-      description:
-          'Gejala ini terjadi pada tanaman tomat karena jamur Phytophthora infestans merusak jaringan '
-          'di permukaan bawah daun. Tanda serangan adalah bercak basah kehitaman dengan lapisan putih. '
-          'Serangan yang kuat dapat mengakibatkan daun menguning dan gugur, menghambat tanaman untuk tumbuh, '
-          'dan bahkan batang tanaman menjadi layu, setelah daun berubah warna menjadi bintik coklat, dan keriput',
-      symptoms: [
-        'Bercak besar coklat kehitaman tidak beraturan',
-        'Permukaan daun bawah terdapat lapisan putih seperti kapas',
-        'Daun mengering dan mati dengan cepat',
-        'Menyebar ke batang dan buah',
-      ],
-      treatment: [
-        'Gunakan fungisida berbahan tembaga (Copper hydroxide)',
-        'Metalaxyl atau propamocarb untuk infeksi berat',
-        'Cabut dan bakar tanaman yang sangat terinfeksi',
-        'Hindari kelembaban berlebih di sekitar tanaman',
-      ],
-      prevention: [
-        'Pilih varietas tahan blight',
-        'Sanitasi lahan setelah panen',
-        'Semprot preventif saat musim hujan',
-        'Perbaiki drainase tanah',
-      ],
-      spreadType: 'Menyebar Cepat',
-      season: 'Musim Dingin/Hujan',
-    ),
-    'Powdery Mildew': Info(
-      indonesianName: 'Jamur Daun',
-      scientificName: 'Oidium neolycopersici',
-      severity: 'Ringan–Sedang',
-      severityLevel: 1,
-      description:
-          'Gejala ini terjadi pada tanaman tomat karena jamur Oidium neolycopersici membentuk lapisan spora '
-          'di permukaan atas daun. Tanda serangan adalah lapisan tepung putih keabu-abuan seperti bedak. '
-          'Serangan yang kuat dapat mengakibatkan daun menguning dan keriput, menghambat tanaman untuk tumbuh, '
-          'dan bahkan pucuk tanaman menjadi mati, setelah daun berubah warna menjadi kecokelatan, dan gugur',
-      symptoms: [
-        'Lapisan putih seperti tepung pada permukaan daun',
-        'Bercak kuning tidak beraturan di atas daun',
-        'Daun menggulung ke atas',
-        'Pertumbuhan terhambat',
-      ],
-      treatment: [
-        'Sulfur wettable powder atau fungisida berbahan sulfur',
-        'Neem oil (minyak mimba) sebagai alternatif organik',
-        'Bicarbonate of soda 0.5% sebagai kontrol ringan',
-        'Kalium bikarbonat untuk serangan awal',
-      ],
-      prevention: [
-        'Pastikan sirkulasi udara baik',
-        'Hindari pemupukan nitrogen berlebihan',
-        'Jaga kelembaban relatif di bawah 70%',
-        'Pangkas daun tua di bagian bawah',
-      ],
-      spreadType: 'Melalui Angin',
-      season: 'Musim Kering',
-    ),
-    'Jamur Daun': Info(
-      indonesianName: 'Jamur Daun',
-      scientificName: 'Oidium neolycopersici',
-      severity: 'Ringan–Sedang',
-      severityLevel: 1,
-      description:
-          'Gejala ini terjadi pada tanaman tomat karena jamur Oidium neolycopersici membentuk lapisan spora '
-          'di permukaan atas daun. Tanda serangan adalah lapisan tepung putih keabu-abuan seperti bedak. '
-          'Serangan yang kuat dapat mengakibatkan daun menguning dan keriput, menghambat tanaman untuk tumbuh, '
-          'dan bahkan pucuk tanaman menjadi mati, setelah daun berubah warna menjadi kecokelatan, dan gugur',
-      symptoms: [
-        'Lapisan putih seperti tepung pada permukaan daun',
-        'Bercak kuning tidak beraturan di atas daun',
-        'Daun menggulung ke atas',
-        'Pertumbuhan terhambat',
-      ],
-      treatment: [
-        'Sulfur wettable powder atau fungisida berbahan sulfur',
-        'Neem oil (minyak mimba) sebagai alternatif organik',
-        'Bicarbonate of soda 0.5% sebagai kontrol ringan',
-        'Kalium bikarbonat untuk serangan awal',
-      ],
-      prevention: [
-        'Pastikan sirkulasi udara baik',
-        'Hindari pemupukan nitrogen berlebihan',
-        'Jaga kelembaban relatif di bawah 70%',
-        'Pangkas daun tua di bagian bawah',
-      ],
-      spreadType: 'Melalui Angin',
-      season: 'Musim Kering',
-    ),
-  };
+        'Healthy': Info(
+          indonesianName: 'Daun Sehat',
+          scientificName: 'Solanum lycopersicum',
+          severity: 'Tidak Ada',
+          severityLevel: 0,
+          description: 'Daun tomat dalam kondisi sehat. Tidak ditemukan '
+              'tanda-tanda infeksi penyakit atau serangan hama pada sampel ini.',
+          symptoms: [
+            'Warna daun hijau merata',
+            'Tidak ada bercak',
+            'Bentuk normal'
+          ],
+          treatment: [
+            'Pertahankan kondisi pertumbuhan optimal',
+            'Siram secara teratur',
+            'Beri pupuk sesuai jadwal'
+          ],
+          prevention: [
+            'Rotasi tanaman tahunan',
+            'Jaga kebersihan kebun',
+            'Gunakan varietas tahan penyakit'
+          ],
+          spreadType: 'Tidak Menyebar',
+          season: 'Sepanjang Tahun',
+        ),
+        'Sehat': Info(
+          indonesianName: 'Daun Sehat',
+          scientificName: 'Solanum lycopersicum',
+          severity: 'Tidak Ada',
+          severityLevel: 0,
+          description: 'Daun tomat dalam kondisi sehat. Tidak ditemukan '
+              'tanda-tanda infeksi penyakit atau serangan hama pada sampel ini.',
+          symptoms: [
+            'Warna daun hijau merata',
+            'Tidak ada bercak',
+            'Bentuk normal'
+          ],
+          treatment: [
+            'Pertahankan kondisi pertumbuhan optimal',
+            'Siram secara teratur',
+            'Beri pupuk sesuai jadwal'
+          ],
+          prevention: [
+            'Rotasi tanaman tahunan',
+            'Jaga kebersihan kebun',
+            'Gunakan varietas tahan penyakit'
+          ],
+          spreadType: 'Tidak Menyebar',
+          season: 'Sepanjang Tahun',
+        ),
+        'Leaf Spot': Info(
+          indonesianName: 'Bercak Daun',
+          scientificName: 'Alternaria solani',
+          severity: 'Sedang',
+          severityLevel: 2,
+          description:
+              'Gejala ini terjadi pada tanaman tomat karena jamur atau bakteri '
+              'menghisap nutrisi dan merusak jaringan di permukaan bawah daun. '
+              'Tanda serangan adalah bercak cokelat kecil berbentuk cincin '
+              'konsentris dengan halo kuning.',
+          symptoms: [
+            'Bercak coklat tua dengan pola cincin konsentris',
+            'Tepi bercak berwarna kuning',
+            'Daun bawah terserang lebih awal',
+            'Daun menguning dan rontok',
+          ],
+          treatment: [
+            'Aplikasikan fungisida berbahan aktif mancozeb atau klorotalonil',
+            'Pangkas dan buang daun yang terinfeksi',
+            'Semprot setiap 7-10 hari sekali saat cuaca lembab',
+            'Gunakan fungisida sistemik jika serangan berat',
+          ],
+          prevention: [
+            'Hindari penyiraman dari atas',
+            'Jaga jarak tanam untuk sirkulasi udara',
+            'Mulching untuk mencegah percikan tanah',
+            'Benih yang sehat dan bersertifikat',
+          ],
+          spreadType: 'Melalui Air & Angin',
+          season: 'Musim Hujan',
+        ),
+        'Bercak Daun': Info(
+          indonesianName: 'Bercak Daun',
+          scientificName: 'Alternaria solani',
+          severity: 'Sedang',
+          severityLevel: 2,
+          description:
+              'Gejala ini terjadi pada tanaman tomat karena jamur atau bakteri '
+              'menghisap nutrisi dan merusak jaringan di permukaan bawah daun. '
+              'Tanda serangan adalah bercak cokelat kecil berbentuk cincin '
+              'konsentris dengan halo kuning.',
+          symptoms: [
+            'Bercak coklat tua dengan pola cincin konsentris',
+            'Tepi bercak berwarna kuning',
+            'Daun bawah terserang lebih awal',
+            'Daun menguning dan rontok',
+          ],
+          treatment: [
+            'Aplikasikan fungisida berbahan aktif mancozeb atau klorotalonil',
+            'Pangkas dan buang daun yang terinfeksi',
+            'Semprot setiap 7-10 hari sekali saat cuaca lembab',
+            'Gunakan fungisida sistemik jika serangan berat',
+          ],
+          prevention: [
+            'Hindari penyiraman dari atas',
+            'Jaga jarak tanam untuk sirkulasi udara',
+            'Mulching untuk mencegah percikan tanah',
+            'Benih yang sehat dan bersertifikat',
+          ],
+          spreadType: 'Melalui Air & Angin',
+          season: 'Musim Hujan',
+        ),
+        'Leaf Blight': Info(
+          indonesianName: 'Busuk Daun',
+          scientificName: 'Phytophthora infestans',
+          severity: 'Tinggi',
+          severityLevel: 3,
+          description:
+              'Gejala ini terjadi pada tanaman tomat karena jamur Phytophthora '
+              'infestans merusak jaringan di permukaan bawah daun. Tanda serangan '
+              'adalah bercak basah kehitaman dengan lapisan putih.',
+          symptoms: [
+            'Bercak besar coklat kehitaman tidak beraturan',
+            'Permukaan daun bawah terdapat lapisan putih seperti kapas',
+            'Daun mengering dan mati dengan cepat',
+            'Menyebar ke batang dan buah',
+          ],
+          treatment: [
+            'Gunakan fungisida berbahan tembaga (Copper hydroxide)',
+            'Metalaxyl atau propamocarb untuk infeksi berat',
+            'Cabut dan bakar tanaman yang sangat terinfeksi',
+            'Hindari kelembaban berlebih di sekitar tanaman',
+          ],
+          prevention: [
+            'Pilih varietas tahan blight',
+            'Sanitasi lahan setelah panen',
+            'Semprot preventif saat musim hujan',
+            'Perbaiki drainase tanah',
+          ],
+          spreadType: 'Menyebar Cepat',
+          season: 'Musim Dingin/Hujan',
+        ),
+        'Busuk Daun': Info(
+          indonesianName: 'Busuk Daun',
+          scientificName: 'Phytophthora infestans',
+          severity: 'Tinggi',
+          severityLevel: 3,
+          description:
+              'Gejala ini terjadi pada tanaman tomat karena jamur Phytophthora '
+              'infestans merusak jaringan di permukaan bawah daun. Tanda serangan '
+              'adalah bercak basah kehitaman dengan lapisan putih.',
+          symptoms: [
+            'Bercak besar coklat kehitaman tidak beraturan',
+            'Permukaan daun bawah terdapat lapisan putih seperti kapas',
+            'Daun mengering dan mati dengan cepat',
+            'Menyebar ke batang dan buah',
+          ],
+          treatment: [
+            'Gunakan fungisida berbahan tembaga (Copper hydroxide)',
+            'Metalaxyl atau propamocarb untuk infeksi berat',
+            'Cabut dan bakar tanaman yang sangat terinfeksi',
+            'Hindari kelembaban berlebih di sekitar tanaman',
+          ],
+          prevention: [
+            'Pilih varietas tahan blight',
+            'Sanitasi lahan setelah panen',
+            'Semprot preventif saat musim hujan',
+            'Perbaiki drainase tanah',
+          ],
+          spreadType: 'Menyebar Cepat',
+          season: 'Musim Dingin/Hujan',
+        ),
+        'Powdery Mildew': Info(
+          indonesianName: 'Jamur Daun',
+          scientificName: 'Oidium neolycopersici',
+          severity: 'Ringan–Sedang',
+          severityLevel: 1,
+          description:
+              'Gejala ini terjadi pada tanaman tomat karena jamur Oidium '
+              'neolycopersici membentuk lapisan spora di permukaan atas daun. '
+              'Tanda serangan adalah lapisan tepung putih keabu-abuan seperti bedak.',
+          symptoms: [
+            'Lapisan putih seperti tepung pada permukaan daun',
+            'Bercak kuning tidak beraturan di atas daun',
+            'Daun menggulung ke atas',
+            'Pertumbuhan terhambat',
+          ],
+          treatment: [
+            'Sulfur wettable powder atau fungisida berbahan sulfur',
+            'Neem oil (minyak mimba) sebagai alternatif organik',
+            'Bicarbonate of soda 0.5% sebagai kontrol ringan',
+            'Kalium bikarbonat untuk serangan awal',
+          ],
+          prevention: [
+            'Pastikan sirkulasi udara baik',
+            'Hindari pemupukan nitrogen berlebihan',
+            'Jaga kelembaban relatif di bawah 70%',
+            'Pangkas daun tua di bagian bawah',
+          ],
+          spreadType: 'Melalui Angin',
+          season: 'Musim Kering',
+        ),
+        'Jamur Daun': Info(
+          indonesianName: 'Jamur Daun',
+          scientificName: 'Oidium neolycopersici',
+          severity: 'Ringan–Sedang',
+          severityLevel: 1,
+          description:
+              'Gejala ini terjadi pada tanaman tomat karena jamur Oidium '
+              'neolycopersici membentuk lapisan spora di permukaan atas daun. '
+              'Tanda serangan adalah lapisan tepung putih keabu-abuan seperti bedak.',
+          symptoms: [
+            'Lapisan putih seperti tepung pada permukaan daun',
+            'Bercak kuning tidak beraturan di atas daun',
+            'Daun menggulung ke atas',
+            'Pertumbuhan terhambat',
+          ],
+          treatment: [
+            'Sulfur wettable powder atau fungisida berbahan sulfur',
+            'Neem oil (minyak mimba) sebagai alternatif organik',
+            'Bicarbonate of soda 0.5% sebagai kontrol ringan',
+            'Kalium bikarbonat untuk serangan awal',
+          ],
+          prevention: [
+            'Pastikan sirkulasi udara baik',
+            'Hindari pemupukan nitrogen berlebihan',
+            'Jaga kelembaban relatif di bawah 70%',
+            'Pangkas daun tua di bagian bawah',
+          ],
+          spreadType: 'Melalui Angin',
+          season: 'Musim Kering',
+        ),
+      };
 
   static Info getInfo(String label) {
     return _data[label] ??
