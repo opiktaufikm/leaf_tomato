@@ -9,19 +9,32 @@
 //   5. Panggil ClassifierService.initialize() saat app startup
 // ════════════════════════════════════════════════════════════════════════════
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart'; // ← FIX: diperlukan untuk debugPrint
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
+const Set<String> _validTomatoLeafLabels = {
+  'healthy',
+  'sehat',
+  'leaf spot',
+  'bercak daun',
+  'leaf blight',
+  'busuk daun',
+  'powdery mildew',
+  'jamur daun',
+};
+
 // ── Model hasil prediksi ──────────────────────────────────────────────────────
 class ClassificationResult {
-  final String label;           // Nama penyakit
-  final double confidence;      // 0.0 – 1.0
-  final int classIndex;         // Index kelas di labels.txt
+  final String label; // Nama penyakit
+  final double confidence; // 0.0 – 1.0
+  final int classIndex; // Index kelas di labels.txt
   final List<double> allScores; // Semua skor untuk visualisasi
 
   const ClassificationResult({
@@ -39,18 +52,12 @@ class ClassificationResult {
 
   /// Apakah ini daun tomat yang valid (bukan objek asing)?
   bool get isValidTomatoLeaf {
-    final validLabels = {
-      'healthy', 'sehat',
-      'leaf spot', 'bercak daun',
-      'leaf blight', 'busuk daun',
-      'powdery mildew', 'jamur daun'
-    };
-    return validLabels.contains(label.toLowerCase()) && confidence >= 0.40;
+    return _validTomatoLeafLabels.contains(label.toLowerCase().trim()) &&
+        confidence >= 0.40;
   }
 
   /// Confidence dalam persen (misal: "94.7%")
-  String get confidencePercent =>
-      '${(confidence * 100).toStringAsFixed(1)}%';
+  String get confidencePercent => '${(confidence * 100).toStringAsFixed(1)}%';
 
   /// Status kepercayaan berdasarkan nilai confidence
   String get confidenceLabel {
@@ -72,8 +79,10 @@ class ClassifierService {
   static const int _inputSize = 224;
 
   Interpreter? _interpreter;
+  IsolateInterpreter? _isolateInterpreter;
   List<String> _labels = [];
   bool _isInitialized = false;
+  bool _isRunningInference = false;
 
   // Singleton pattern agar hanya ada 1 instance
   static final ClassifierService _instance = ClassifierService._internal();
@@ -97,22 +106,18 @@ class ClassifierService {
     'lainnya',
   };
 
-  /// Minimum confidence agar hasil dianggap valid.
-  static const double _minConfidence = 0.60;
+  /// Minimum confidence realtime agar objek asing tidak mudah masuk 4 kelas.
+  static const double _minConfidence = 0.55;
 
-  /// Validasi hasil klasifikasi secara dinamis:
-  ///   true  → label berasal dari kelas daun tomat & confidence cukup tinggi
+  /// Validasi hasil klasifikasi realtime:
+  ///   true  → label berasal dari 4 kelas daun tomat & confidence cukup tinggi
   ///   false → label adalah kelas non-daun / background / confidence rendah
-  ///
-  /// Berbeda dengan [ClassificationResult.isValidTomatoLeaf] yang hardcoded,
-  /// method ini memakai [_labels] dari labels.txt → otomatis sesuai model.
   bool isValidLeafResult(ClassificationResult result) {
     if (result.confidence < _minConfidence) return false;
     final lbl = result.label.toLowerCase().trim();
     if (_excludedLabels.contains(lbl)) return false;
-    return _labels.any((l) => l.toLowerCase().trim() == lbl);
+    return _validTomatoLeafLabels.contains(lbl);
   }
-
 
   // ── Inisialisasi: muat model + label ─────────────────────────────────────
   Future<void> initialize() async {
@@ -126,6 +131,15 @@ class ClassifierService {
         options: interpreterOptions,
       );
       debugPrint('[ClassifierService] Model berhasil dimuat');
+
+      try {
+        _isolateInterpreter = await IsolateInterpreter.create(
+          address: _interpreter!.address,
+        );
+        debugPrint('[ClassifierService] Isolate inferensi berhasil dibuat');
+      } catch (e) {
+        debugPrint('[ClassifierService] Isolate inferensi tidak tersedia: $e');
+      }
 
       debugPrint('[ClassifierService] Memuat label dari: $_labelsPath');
       final labelData = await rootBundle.loadString(_labelsPath);
@@ -196,103 +210,296 @@ class ClassifierService {
     return _runInference(image);
   }
 
-  /// ── Decode YUV420 bytes langsung tanpa library ────────────────────────────
+  // ── Klasifikasi frame kamera live tanpa encode/decode ulang ──────────────
+  Future<ClassificationResult> classifyCameraImage(CameraImage frame) async {
+    if (!_isInitialized) await initialize();
+    if (frame.format.group != ImageFormatGroup.yuv420 ||
+        frame.planes.length < 3) {
+      throw Exception('Format frame kamera tidak didukung.');
+    }
+
+    final inputBytes = _cameraYuv420ToInputBytes(frame);
+    return _runInputBytes(inputBytes);
+  }
+
+  /// ── Decode YUV420 bytes langsung tanpa library (OPTIMIZED) ──────────────────
+  /// Menggunakan batch conversion daripada pixel-by-pixel untuk performa lebih baik
   img.Image _decodeYUV420Direct(
       Uint8List data, int width, int height, int ySize) {
     final image = img.Image(width: width, height: height);
 
     try {
       final yPlane = data.sublist(12, 12 + ySize);
-      final uPlane = data.sublist(12 + ySize, 12 + ySize + (ySize ~/ 4));
-      final vPlane = data.sublist(12 + ySize + (ySize ~/ 4));
+      final uvSize = ySize ~/ 4;
+      final uPlane = data.sublist(12 + ySize, 12 + ySize + uvSize);
+      final vPlane = data.sublist(12 + ySize + uvSize);
 
+      final int halfWidth = width ~/ 2;
+
+      // ── Optimized: Batch processing dengan caching constants ──────────
       for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-          final yIndex = y * width + x;
-          final uvIndex = (y ~/ 2) * (width ~/ 2) + (x ~/ 2);
+        final yRowOffset = y * width;
+        final uvRowOffset = (y ~/ 2) * halfWidth;
 
+        for (int x = 0; x < width; x++) {
+          final yIndex = yRowOffset + x;
+          final uvIndex = uvRowOffset + (x ~/ 2);
+
+          // Cached lookups
           final yVal = yPlane[yIndex].toDouble();
           final uVal = uPlane[uvIndex].toDouble() - 128.0;
           final vVal = vPlane[uvIndex].toDouble() - 128.0;
 
+          // YUV to RGB conversion
           final r = (yVal + 1.402 * vVal).clamp(0, 255).toInt();
-          final g = (yVal - 0.344136 * uVal - 0.714136 * vVal)
-              .clamp(0, 255)
-              .toInt();
+          final g =
+              (yVal - 0.344136 * uVal - 0.714136 * vVal).clamp(0, 255).toInt();
           final b = (yVal + 1.772 * uVal).clamp(0, 255).toInt();
 
           image.setPixelRgba(x, y, r, g, b, 255);
         }
       }
     } catch (e) {
-      debugPrint('⚠️  YUV420 decode failed: $e'); // ← sekarang bisa dikenali
-      // Return dummy image jika decode gagal
+      debugPrint('⚠️  YUV420 decode failed: $e');
       return image;
     }
 
     return image;
   }
 
-  // ── Core inference pipeline ──────────────────────────────────────────────
-  ClassificationResult _runInference(img.Image rawImage) {
-    // STEP 1: Resize ke 224x224 (input MobileNetV2)
+  Uint8List _cameraYuv420ToInputBytes(CameraImage frame) {
+    final interpreter = _interpreter;
+    if (interpreter == null) {
+      throw Exception('Model belum diinisialisasi.');
+    }
+
+    final inputType = interpreter.getInputTensor(0).type;
+    final yPlane = frame.planes[0];
+    final uPlane = frame.planes[1];
+    final vPlane = frame.planes[2];
+    final yBytes = yPlane.bytes;
+    final uBytes = uPlane.bytes;
+    final vBytes = vPlane.bytes;
+    final yRowStride = yPlane.bytesPerRow;
+    final yPixelStride = yPlane.bytesPerPixel ?? 1;
+    final uvRowStride = uPlane.bytesPerRow;
+    final uvPixelStride = uPlane.bytesPerPixel ?? 1;
+
+    if (inputType == TensorType.uint8) {
+      final input = Uint8List(_inputSize * _inputSize * 3);
+      var offset = 0;
+      for (int y = 0; y < _inputSize; y++) {
+        final sourceY = y * frame.height ~/ _inputSize;
+        final yRow = sourceY * yRowStride;
+        final uvRow = (sourceY >> 1) * uvRowStride;
+        for (int x = 0; x < _inputSize; x++) {
+          final sourceX = x * frame.width ~/ _inputSize;
+          final yIndex = yRow + sourceX * yPixelStride;
+          final uvIndex = uvRow + (sourceX >> 1) * uvPixelStride;
+          final rgb = _yuvToRgb(
+            yBytes[_safeIndex(yIndex, yBytes.length)],
+            uBytes[_safeIndex(uvIndex, uBytes.length)],
+            vBytes[_safeIndex(uvIndex, vBytes.length)],
+          );
+          input[offset++] = (rgb >> 16) & 0xFF;
+          input[offset++] = (rgb >> 8) & 0xFF;
+          input[offset++] = rgb & 0xFF;
+        }
+      }
+      return input;
+    }
+
+    if (inputType != TensorType.float32) {
+      throw UnsupportedError('Tipe input model $inputType belum didukung.');
+    }
+
+    final input = Float32List(_inputSize * _inputSize * 3);
+    var offset = 0;
+    for (int y = 0; y < _inputSize; y++) {
+      final sourceY = y * frame.height ~/ _inputSize;
+      final yRow = sourceY * yRowStride;
+      final uvRow = (sourceY >> 1) * uvRowStride;
+      for (int x = 0; x < _inputSize; x++) {
+        final sourceX = x * frame.width ~/ _inputSize;
+        final yIndex = yRow + sourceX * yPixelStride;
+        final uvIndex = uvRow + (sourceX >> 1) * uvPixelStride;
+        final rgb = _yuvToRgb(
+          yBytes[_safeIndex(yIndex, yBytes.length)],
+          uBytes[_safeIndex(uvIndex, uBytes.length)],
+          vBytes[_safeIndex(uvIndex, vBytes.length)],
+        );
+        input[offset++] = (((rgb >> 16) & 0xFF) / 127.5) - 1.0;
+        input[offset++] = (((rgb >> 8) & 0xFF) / 127.5) - 1.0;
+        input[offset++] = ((rgb & 0xFF) / 127.5) - 1.0;
+      }
+    }
+    return input.buffer.asUint8List();
+  }
+
+  Uint8List _imageToInputBytes(img.Image rawImage) {
+    final interpreter = _interpreter;
+    if (interpreter == null) {
+      throw Exception('Model belum diinisialisasi.');
+    }
+
     final resized = img.copyResize(
       rawImage,
       width: _inputSize,
       height: _inputSize,
+      interpolation: img.Interpolation.linear,
     );
+    final inputType = interpreter.getInputTensor(0).type;
 
-    // STEP 2: Buat normalized input tensor dengan Float32List (efficient)
-    // Reshape dari flat array ke [1, 224, 224, 3] tanpa allocation extra
-    final inputTensor = List<List<List<List<double>>>>.generate(
-      1,
-      (_) => List.generate(
-        _inputSize,
-        (y) {
-          final row = <List<double>>[];
-          for (int x = 0; x < _inputSize; x++) {
-            final pixel = resized.getPixel(x, y);
-            row.add([
-              (pixel.r / 127.5) - 1.0, // R
-              (pixel.g / 127.5) - 1.0, // G
-              (pixel.b / 127.5) - 1.0, // B
-            ]);
-          }
-          return row;
-        },
-      ),
-    );
+    if (inputType == TensorType.uint8) {
+      final input = Uint8List(_inputSize * _inputSize * 3);
+      var offset = 0;
+      for (int y = 0; y < _inputSize; y++) {
+        for (int x = 0; x < _inputSize; x++) {
+          final pixel = resized.getPixel(x, y);
+          input[offset++] = pixel.r.toInt();
+          input[offset++] = pixel.g.toInt();
+          input[offset++] = pixel.b.toInt();
+        }
+      }
+      return input;
+    }
 
-    // STEP 3: Siapkan output tensor
-    final outputTensor = List.generate(
-      1,
-      (_) => List.filled(_labels.length, 0.0),
-    );
+    if (inputType != TensorType.float32) {
+      throw UnsupportedError('Tipe input model $inputType belum didukung.');
+    }
 
-    // STEP 4: Jalankan inferensi
-    if (_interpreter != null) {
-      _interpreter!.run(inputTensor, outputTensor);
-    } else {
+    final input = Float32List(_inputSize * _inputSize * 3);
+    var offset = 0;
+    for (int y = 0; y < _inputSize; y++) {
+      for (int x = 0; x < _inputSize; x++) {
+        final pixel = resized.getPixel(x, y);
+        input[offset++] = (pixel.r / 127.5) - 1.0;
+        input[offset++] = (pixel.g / 127.5) - 1.0;
+        input[offset++] = (pixel.b / 127.5) - 1.0;
+      }
+    }
+    return input.buffer.asUint8List();
+  }
+
+  // ── Core inference pipeline ──────────────────────────────────────────────
+  Future<ClassificationResult> _runInference(img.Image rawImage) {
+    return _runInputBytes(_imageToInputBytes(rawImage));
+  }
+
+  Future<ClassificationResult> _runInputBytes(Uint8List inputBytes) async {
+    final interpreter = _interpreter;
+    if (interpreter == null) {
       throw Exception(
           'Model belum diinisialisasi. Pastikan initialize() dipanggil terlebih dahulu.');
     }
 
-    // STEP 5: Post-processing
-    final scores = outputTensor[0];
-    final allScores = List<double>.from(scores);
-    final softmaxScores = _softmax(allScores);
-    final maxIndex = _argmax(softmaxScores);
-    final maxScore = softmaxScores[maxIndex];
+    while (_isRunningInference) {
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
 
+    _isRunningInference = true;
+    try {
+      final outputTensor = interpreter.getOutputTensor(0);
+      final outputBytes = Uint8List(outputTensor.numBytes());
+      final isolate = _isolateInterpreter;
+      if (isolate != null) {
+        await isolate.run(inputBytes, outputBytes);
+      } else {
+        interpreter.run(inputBytes, outputBytes);
+      }
+
+      return _classificationFromScores(
+        _readOutputScores(outputBytes, outputTensor),
+      );
+    } finally {
+      _isRunningInference = false;
+    }
+  }
+
+  List<double> _readOutputScores(Uint8List outputBytes, Tensor outputTensor) {
+    final count = outputTensor.numElements();
+    if (outputTensor.type == TensorType.float32) {
+      final data = ByteData.sublistView(outputBytes);
+      return List<double>.generate(
+        count,
+        (i) => data.getFloat32(i * 4, Endian.little),
+        growable: false,
+      );
+    }
+
+    if (outputTensor.type == TensorType.uint8) {
+      final params = outputTensor.params;
+      return List<double>.generate(
+        count,
+        (i) => (outputBytes[i] - params.zeroPoint) * params.scale,
+        growable: false,
+      );
+    }
+
+    if (outputTensor.type == TensorType.int8) {
+      final params = outputTensor.params;
+      final data = ByteData.sublistView(outputBytes);
+      return List<double>.generate(
+        count,
+        (i) => (data.getInt8(i) - params.zeroPoint) * params.scale,
+        growable: false,
+      );
+    }
+
+    throw UnsupportedError(
+        'Tipe output model ${outputTensor.type} belum didukung.');
+  }
+
+  ClassificationResult _classificationFromScores(List<double> scores) {
+    final usableCount = min(scores.length, _labels.length);
+    if (usableCount == 0) {
+      throw Exception('Model tidak menghasilkan skor klasifikasi.');
+    }
+
+    final normalizedScores = _normalizeScores(scores.take(usableCount));
+    final maxIndex = _argmax(normalizedScores);
     return ClassificationResult(
       label: _labels[maxIndex],
-      confidence: maxScore,
+      confidence: normalizedScores[maxIndex],
       classIndex: maxIndex,
-      allScores: softmaxScores,
+      allScores: normalizedScores,
     );
   }
 
+  int _yuvToRgb(int y, int u, int v) {
+    final c = y - 16;
+    final d = u - 128;
+    final e = v - 128;
+    final r = _clampByte((298 * c + 409 * e + 128) >> 8);
+    final g = _clampByte((298 * c - 100 * d - 208 * e + 128) >> 8);
+    final b = _clampByte((298 * c + 516 * d + 128) >> 8);
+    return (r << 16) | (g << 8) | b;
+  }
+
+  int _safeIndex(int index, int length) {
+    if (index < 0) return 0;
+    if (index >= length) return length - 1;
+    return index;
+  }
+
+  int _clampByte(int value) {
+    if (value < 0) return 0;
+    if (value > 255) return 255;
+    return value;
+  }
+
   // ── Helper: Softmax normalization ─────────────────────────────────────────
+  List<double> _normalizeScores(Iterable<double> rawScores) {
+    final scores = List<double>.from(rawScores);
+    final sum = scores.fold<double>(0, (total, value) => total + value);
+    final alreadyProbabilities =
+        scores.every((value) => value >= 0 && value <= 1) &&
+            sum > 0.98 &&
+            sum < 1.02;
+
+    return alreadyProbabilities ? scores : _softmax(scores);
+  }
+
   List<double> _softmax(List<double> logits) {
     final maxVal = logits.reduce(max);
     final exps = logits.map((v) => exp(v - maxVal)).toList();
@@ -311,7 +518,13 @@ class ClassifierService {
 
   // ── Bersihkan resource ───────────────────────────────────────────────────
   void dispose() {
+    final isolate = _isolateInterpreter;
+    if (isolate != null) {
+      unawaited(isolate.close());
+    }
+    _isolateInterpreter = null;
     _interpreter?.close();
+    _interpreter = null;
     _isInitialized = false;
   }
 }

@@ -174,15 +174,15 @@ const List<_GuideSection> _guideSections = [
         number: 4,
         title: 'Deteksi Berjalan Otomatis',
         description:
-            'Tanda lingkaran oranye akan muncul jika terdeteksi area yang bermasalah. Bar kepercayaan di bawah menunjukkan akurasi deteksi secara live.',
+            'Kartu hasil di bagian bawah akan memperbarui nama kondisi daun dan persentase kepercayaan secara live.',
         stepIcon: Icons.auto_awesome_rounded,
       ),
       _GuideStep(
         number: 5,
-        title: 'Simpan Hasil',
+        title: 'Baca Hasil Live',
         description:
-            'Saat hasil deteksi sudah stabil, ketuk tombol "Capture & Save" untuk menyimpan hasil ke riwayat scan.',
-        stepIcon: Icons.save_alt_rounded,
+            'Saat hasil deteksi sudah stabil, baca nama penyakit dan persentase kepercayaan yang tampil di kartu hasil.',
+        stepIcon: Icons.fact_check_rounded,
       ),
     ],
   ),
@@ -276,8 +276,8 @@ class _GuideScreenState extends State<GuideScreen>
                   ),
                   // Help badge
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: AppTheme.accentGreen,
                       borderRadius: BorderRadius.circular(20),
@@ -327,9 +327,7 @@ class _GuideScreenState extends State<GuideScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 12),
                       decoration: BoxDecoration(
-                        color: isActive
-                            ? section.accentColor
-                            : Colors.white,
+                        color: isActive ? section.accentColor : Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
                           color: isActive
@@ -344,9 +342,7 @@ class _GuideScreenState extends State<GuideScreen>
                           Icon(
                             section.icon,
                             size: 22,
-                            color: isActive
-                                ? Colors.white
-                                : section.iconColor,
+                            color: isActive ? Colors.white : section.iconColor,
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -358,9 +354,8 @@ class _GuideScreenState extends State<GuideScreen>
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: isActive
-                                  ? Colors.white
-                                  : AppTheme.subtleText,
+                              color:
+                                  isActive ? Colors.white : AppTheme.subtleText,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -462,8 +457,8 @@ class _GuideSectionView extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: section.accentColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
