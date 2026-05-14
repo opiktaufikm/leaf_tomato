@@ -14,7 +14,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:camera/camera.dart';
-import 'package:flutter/foundation.dart'; // ← FIX: diperlukan untuk debugPrint
+import 'package:flutter/foundation.dart'; 
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -53,7 +53,7 @@ class ClassificationResult {
   /// Apakah ini daun tomat yang valid (bukan objek asing)?
   bool get isValidTomatoLeaf {
     return _validTomatoLeafLabels.contains(label.toLowerCase().trim()) &&
-        confidence >= 0.40;
+        confidence >= 0.75;
   }
 
   /// Confidence dalam persen (misal: "94.7%")
@@ -107,7 +107,7 @@ class ClassifierService {
   };
 
   /// Minimum confidence realtime agar objek asing tidak mudah masuk 4 kelas.
-  static const double _minConfidence = 0.55;
+  static const double _minConfidence = 0.75;
 
   /// Validasi hasil klasifikasi realtime:
   ///   true  → label berasal dari 4 kelas daun tomat & confidence cukup tinggi
